@@ -55,6 +55,8 @@ static void MX_ADC_Init(void);
 static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
+// Viele der Werte sind nicht konstant, damit man sie online anpassen kann!
+
 // Rechtecksignal beschreiben
 #define periodendauer 50	// Wie viele Messzyklen eine Periode dauert
 const unsigned int t_ein = 13;	// Wie viele Messzyklen das Signal an ist
@@ -63,7 +65,7 @@ const unsigned int t_ein = 13;	// Wie viele Messzyklen das Signal an ist
 volatile long wert_aus = - ((float)t_ein / ((float)periodendauer - (float)t_ein)) * (float)wert_an;	// Wie groß das Signal im "Aus"-Zustand ist, um Gleichanteilsfrei zu bleiben
 
 //#define schwelle 1000	// Der gefaltete Wert muss nachher über dieser Schwelle liegen, um als erfolgreich gemessen zu gelten
-volatile long schwelle = 10000;
+volatile long schwelle = 2000000;
 
 // Messung
 volatile long messwerte[periodendauer];	// Verlauf der Messungen
@@ -74,9 +76,9 @@ volatile unsigned char neuer_messwert = 0;	// bool: Neuer Messwert vorhanden, f�
 volatile unsigned int erfolge_letzte_periode = 0;	// Wie viele erfolgreiche Erkennungen in der letzten Periode passiert sind
 
 // Kumulieren über mehrere Perioden
-volatile int notigeErfolgeProPeriode = 15;	// So viele Erfolge braucht es, damit die Periode als Erfolg gilt
-volatile int anzahlPerioden = 200;	// Über wie viele Perioden aufgezeichnet wird
-volatile int notigeErfolgreichePerioden = 195;	// Wie viele der Perioden erfolgreich sein müssen
+volatile int notigeErfolgeProPeriode = 13;	// So viele Erfolge braucht es, damit die Periode als Erfolg gilt
+volatile int anzahlPerioden = 50;	// Über wie viele Perioden aufgezeichnet wird
+volatile int notigeErfolgreichePerioden = 47;	// Wie viele der Perioden erfolgreich sein müssen
 volatile int zuletztErfolgreichePerioden;	// Wie viele bei der letzten Messung erfolgreich waren
 
 // Erkanntes Signal
