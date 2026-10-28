@@ -63,9 +63,108 @@ Mit Vorfilter sanken die false-positives ohne Neukalibrierungen quasi auf 0.
 Die Taschenlampe wurde mit mindestens gleicher sensibilität erkannt.
 Durch Neukalibrierung konnte die Sensibilität sogar noch erhöht werden.
 
-Leider sieht das "empfangene" Signal jetzt anders aus:\
-![](assets/images/2026-10-28-17-56-49.png)
+Ich taste mit 10kHz ab, also alle 100us.
 
 ## Erkennen des Signals
+Laut der Matched-Filter-Theorie muss ich das empfangene Signal mit dem zeitlich inversen "idealen Signal" falten.
+
+Bei einem PWM-Signal ist das wie anfangs erwähnt recht einfach.
+
+Leider sieht das "empfangene" Signal durch den Vorfilter jetzt so aus:\
+![](assets/images/2026-10-28-17-56-49.png)
+
+Es funktioniert immernoch, wenn man ein PWM-Signal annimmt, jedoch deutlich ungenauer.
+
+Also habe ich den Signalverlauf mit dem Oszilloskop aufgezeichnet und als CSV exportiert.
+Dann habe ich mit einem Python-Skript exakt eine Periode des Signals extrahiert und auf 50 Punkte reduziert:\
+![](assets/images/2026-10-28-21-26-30.png)
+
+Im Folgenden nenne ich diesen Verlauf "Vorlage".
+
+Ich war zu faul, eine Mittlung durchzuführen, weswegen der entstandene Verlauf minimal verzerrt wirkt.
+Aber durch einen einfachen digitalen Lowpass hab ich es gejagt.
+Nachher natürlich noch den Gleichanteil entfernt, sehr wichtig!
+
+Um die Faltung durchzuführen, werden die jeweils 50 aktuellsten Messungen in einem Array gespeichert (Ringpuffer).
+Nach jeder Messung wird jede einzelne gepufferte Messung mit einem Wert der Vorlage multipliziert.
+Die älteste Messung mit Index 0, die danach mit Index 1, usw.
+
+Die Produkte dieser Multiplikationen werden addiert.
+
+Diese Summe entspricht der Faltung mit dem Inversen der Vorlage.
+Laut der Theorie ist diese maximal, wenn der gemessene Signalverlauf der Vorlage entspricht.
+
+Natürlich springt dieses Filter auch auf andere Signalverläufe an, daher braucht es eine gewisse Entscheidungsschwelle.
+Also: "ab welchem Faltungswert wird das Signal zuverlässig erkannt, Störungen aber noch abgeblockt?"
+Ich habe durch Ausprobieren einen sinnvollen Wert ermittelt und konfiguriert.
+
+# Nachfiltern
+Trotz der wirklich guten Detektion des Signals ist es möglich, dass ungewollte Signalverläufe den Entscheider "überleben".
+Also dass der Faltungswert eines fremden Signals oberhalb der Schwelle liegt.
+Genauso ist es möglich, dass ein korrekter Signalverlauf im Signal enthalten ist, aber so schwach, dass es "übersehen" wird.
+
+Es ist ein Kompromiss zwischen Sensibilität und Zuverlässigkeit.
+Der Sensor ist witzlos, wenn man die Taschenlampe 1cm vor ihn halten muss, um ihn auszulösen.
+Genauso witzlos wäre er, wenn er ständig falsch auslöst.
+
+Stattdessen wird ein längerer Teil des Signals betrachtet.
+Die Messung wird langsamer, dafür sinkt jedoch die Chance eines fehlerhaften Auslösens.
+
+Faltungen sind teuer (rechenintensiv), weswegen ich mich dafür entschied, die Signalvorlage nicht zu "vergrößern", also einen Signalverlauf mit 10-20 Perioden zu "suchen".
+
+Stattdessen wird für jede Periode gezählt, wie viele Faltungen die Schwelle überschritten haben.
+Sind es ausreichend viele, wird angenommen, dass diese Periode korrekt detektiert wurde.
+
+Genauso können "eine Ebene höher" ganze Perioden zusammengefasst werden.
+Gelten n ganze Perioden als "korrekt detektiert", wird angenommen, dass das gesuchte Signal tatsächlich vorliegt.
+
+Es stehen insgesamt also 3 Schwellen zur Verfügung, um die Sensibilität des Detektors einzustellen:
+- Schwelle der Faltung
+- Schwelle der Periode
+- Schwelle mehrerer Perioden
+
+## Mögliche Verbesserung
+Alternativ könnte ein "Trend" ermittelt werden.
+Dazu wird ein Zähler genutzt, der bei erfolgreicher Periode hoch und ansonsten runter zählt.
+Liegt der Zähler über einer gewissen Schwelle, gilt das Signal als detektiert.
+
+So ergibt sich eine Art Hystereseverhalten: Wird ein Signal länger erkannt, muss es auch länger weggenommen sein, bis der Detektor ausschaltet.
+
+Der Zähler wird natürlich nach oben und unten begrenzt.
+
+# Ergebnis / Fazit
+Der entstandene Detektor übertrifft die Erwartungen deutlich.
+
+## Raumbeleuchtung
+Bei normaler Raumbeleuchtung erkennt er die Taschenlampe zuverlässig selbst vom anderen Ende des Raumes aus (5m).
+
+Die Richtcharakteristik der Photodiode ist deutlich spürbar.
+Aus ca. 2m Entfernung messe ich (sehr ungenau) einen Öffnungswinkel von 80°.
+Ein 3d-gedruckter Diffusor könnte ausreichend sein, um den Öffnungswinkel auf 180° zu erhöhen.
+
+Trotzdem steht der Detektor seit ca. einer Stunde inaktiv neben mir, ohne einmal fehlerhaft ausgelöst zu haben.
+Er scheint für Innenräume gut geeignet zu sein.
+
+## Starke, direkte Beleuchtung
+Um einen Extremfall zu simulieren habe ich mit meiner Handytaschenlampe helles Dauerlicht aus ca. 5 cm Entfernung frontal auf den Detektor geleuchte.
+
+Die Sensibilität lässt stark nach, sodass die Taschenlampe direkt vor den Sensor (1 cm) gehalten muss, um eine Auslösung zu verursachen.
+
+Es treten keine Falschauslösungen auf.
+
+Offensichtlich überschreitet eine derartig starke, frontale Beleuchtung den Dynamikbereich des Sensors.
+Ein logarithmischer Detektor könnte das Problem umgehen, umfasst allerdings deutlich mehr (und teurere!) Bauteile.
+
+## Starke, seitliche Beleuchtung
+Das selbe Dauerlicht wie im vorherigen Abschnitt wurde aus ca. 5 cm Entfernung seitlich auf den Detektor geleuchtet.
+
+Der Sensor löst bei einer Entfernung von bis zu ca. 30 cm frontaler Beleuchtung aus.
+Der Öffnungswinkel bei ca. 20cm beträgt ca. 20°.
+
+## Sonnenlicht
+Direktes Sonnenlicht ist vermutlich der ungünstigste Anwendungsfall, da die Photodiode besonders sensibel auf Infrarotes Licht reagiert.
+
+Der Test wird erstmal zurückgestellt, da ich ihn nicht bei Nacht vom Schreibtisch aus durchführen kann.
+
 
 
