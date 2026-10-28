@@ -57,6 +57,60 @@ static void MX_TIM3_Init(void);
 
 // Viele der Werte sind nicht konstant, damit man sie online anpassen kann!
 
+// Tiefpassgefiltertes Signal
+const long signal[50] = {
+	-3631,
+	-2849,
+	-1106,
+	335,
+	1664,
+	2821,
+	3858,
+	4781,
+	5604,
+	6360,
+	7062,
+	7632,
+	8302,
+	7944,
+	6374,
+	5250,
+	4235,
+	3361,
+	2564,
+	1862,
+	1214,
+	663,
+	147,
+	-351,
+	-734,
+	-1089,
+	-1392,
+	-1670,
+	-1926,
+	-2147,
+	-2346,
+	-2528,
+	-2689,
+	-2829,
+	-2956,
+	-3091,
+	-3169,
+	-3268,
+	-3379,
+	-3360,
+	-3437,
+	-3549,
+	-3566,
+	-3566,
+	-3567,
+	-3567,
+	-3567,
+	-3567,
+	-3567,
+	-3567
+};
+
 // Rechtecksignal beschreiben
 #define periodendauer 50	// Wie viele Messzyklen eine Periode dauert
 const unsigned int t_ein = 13;	// Wie viele Messzyklen das Signal an ist
@@ -76,9 +130,9 @@ volatile unsigned char neuer_messwert = 0;	// bool: Neuer Messwert vorhanden, f�
 volatile unsigned int erfolge_letzte_periode = 0;	// Wie viele erfolgreiche Erkennungen in der letzten Periode passiert sind
 
 // Kumulieren über mehrere Perioden
-volatile int notigeErfolgeProPeriode = 13;	// So viele Erfolge braucht es, damit die Periode als Erfolg gilt
+volatile int notigeErfolgeProPeriode = 15;	// So viele Erfolge braucht es, damit die Periode als Erfolg gilt
 volatile int anzahlPerioden = 50;	// Über wie viele Perioden aufgezeichnet wird
-volatile int notigeErfolgreichePerioden = 47;	// Wie viele der Perioden erfolgreich sein müssen
+volatile int notigeErfolgreichePerioden = 10;	// Wie viele der Perioden erfolgreich sein müssen
 volatile int zuletztErfolgreichePerioden;	// Wie viele bei der letzten Messung erfolgreich waren
 
 // Erkanntes Signal
@@ -106,6 +160,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 
 unsigned char macheFaltung(){
+	// Führe eine einzelne Faltung durch und gib zurück, ob das Ergebnis über der Schwelle liegt
+	long summe = 0;
+	unsigned int i = zeiger;
+	for (unsigned int s = 0; s < periodendauer; s++){
+		summe += messwerte[i++] * signal[s];
+		if (i >= periodendauer) i = 0;
+	}
+
+	return summe >= schwelle;
+}
+
+unsigned char macheFaltungRechteck(){
 	// Führe eine einzelne Faltung durch und gib zurück, ob das Ergebnis über der Schwelle liegt
 	long summe = 0;
 	unsigned int i = zeiger;
@@ -347,8 +413,8 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
@@ -357,7 +423,7 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pin = LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
